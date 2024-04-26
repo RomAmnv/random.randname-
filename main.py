@@ -15,10 +15,9 @@ mydb = mysql.connector.connect(
 
 mycursor = mydb.cursor()
 
-#mycursor.execute("CREATE TABLE customers (name VARCHAR(255), address VARCHAR(255))")
-#mycursor.execute("CREATE TABLE users (first_name VARCHAR(255), last_name VARCHAR(255), role VARCHAR(255))")
-#mycursor.execute("ALTER TABLE users ADD COLUMN (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT UNIQUE)")
-
+# mycursor.execute("CREATE TABLE users (first_name VARCHAR(255), last_name VARCHAR(255), role VARCHAR(255))")
+# mycursor.execute("ALTER TABLE users ADD COLUMN (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT UNIQUE)")
+# mycursor.execute("ALTER TABLE users ADD COLUMN (second_name VARCHAR(255))")
 
 user_dict = {}
 
@@ -26,7 +25,9 @@ user_dict = {}
 class User:
     def __init__(self, first_name):
         self.first_name = first_name
+        self.second_name = ""
         self.last_name = ""
+        self.email = ""
         self.role = None
 
 
@@ -40,6 +41,20 @@ def process_firstname_step(message):
     try:
         user_id = message.from_user.id
         user_dict[user_id] = User(message.text)
+        msg = bot.send_message(message.chat.id, "Second name")
+        bot.register_next_step_handler(msg, process_secondname_step)
+
+
+    except Exception as e:
+        bot.reply_to(message, "error: " + str(e))
+
+
+def process_secondname_step(message):
+    try:
+        user_id = message.from_user.id
+        user = user_dict[user_id]
+        user.second_name = message.text
+
         msg = bot.send_message(message.chat.id, "Last name")
         bot.register_next_step_handler(msg, process_lastname_step)
 
@@ -47,18 +62,30 @@ def process_firstname_step(message):
     except Exception as e:
         bot.reply_to(message, "error: " + str(e))
 
-
 def process_lastname_step(message):
     try:
         user_id = message.from_user.id
         user = user_dict[user_id]
         user.last_name = message.text
 
+        msg = bot.send_message(message.chat.id, "Your email")
+        bot.register_next_step_handler(msg, process_email_step)
+
+
+    except Exception as e:
+        bot.reply_to(message, "error: " + str(e))
+
+
+def process_email_step(message):
+    try:
+        user_id = message.from_user.id
+        user = user_dict[user_id]
+        user.email = message.text
+
         markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
         markup.add('Student', 'Teacher')
         msg = bot.send_message(message.chat.id, "Select your role", reply_markup=markup)
         bot.register_next_step_handler(msg, process_role_step)
-
 
     except Exception as e:
         bot.reply_to(message, "error: " + str(e))
@@ -74,13 +101,12 @@ def process_role_step(message):
         else:
             raise Exception("Unknown role")
         bot.send_message(user_id,
-                         'Nice to meet you ' + user.first_name + " " + user.last_name + '\n Role: ' + user.role)
-        sql = "INSERT INTO users (first_name, last_name, role, user_id) VALUES (%s, %s, %s, %s)"
-        val = (user.first_name, user.last_name, user.role, user_id)
+                         'Nice to meet you, ' + user.second_name + " " + user.first_name + " " + user.last_name + "\nEmail: " + user.email + '\nRole: ' + user.role)
+        sql = "INSERT INTO users (first_name, second_name, last_name, email, role, user_id) VALUES (%s, %s, %s, %s, %s, %s)"
+        val = (user.first_name, user.second_name, user.last_name, user.email, user.role, user_id)
         mycursor.execute(sql, val)
         mydb.commit()
     except Exception as e:
-        #bot.reply_to(message, "error: " + str(e))
         bot.reply_to(message, "Error, you are already registered in the system")
 
 
