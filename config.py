@@ -1,0 +1,2 @@
+TOKEN = "6890224842:AAGmxZaH-_kv_Q7IUo602EuxzL9sAxlf654"
+PASSWORD="avr_hack_enjoyer123"
