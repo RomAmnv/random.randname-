@@ -1,23 +1,23 @@
 import telebot
-from app.Function import recognizeAudio
+#from app.Function import recognizeAudio
 from telebot import types
-from pydub import AudioSegment
+#from pydub import AudioSegment
 import config
 import mysql.connector
 import os
 import wave
 import requests
 import subprocess
-from __init__ import cursor
-from pydub import AudioSegment
+#from __init__ import cursor
+#from pydub import AudioSegment
 
-AudioSegment.preferred_ffmpeg = "avprobe"
+#AudioSegment.preferred_ffmpeg = "avprobe"
 bot = telebot.TeleBot(config.TOKEN)
 
 mydb = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="root",
+    password=config.PASSWORD,
     port="3306",
     database="mydatabase"
 )
@@ -35,6 +35,8 @@ class User:
         self.last_name = ""
         self.email = ""
         self.role = None
+
+
 
 @bot.message_handler(commands=['start'])
 def main(message):
@@ -122,6 +124,75 @@ def process_role_step(message):
     except Exception as e:
         print("Role step",e)
         bot.reply_to(message, "Error, you are already registered in the system")
+
+
+class Webinar:
+    def __init__(self, name, date):
+        self.name = name
+        self.date = date
+
+
+@bot.message_handler(commands=['add_webinar'])
+def add_webinar_info(message):
+    try:
+        user_id = message.from_user.id
+        sql = "SELECT id_teacher FROM teacher WHERE id_teacher = %s"
+        val = (user_id,)
+        mycursor.execute(sql, val)
+        result = mycursor.fetchone()
+
+        if result:
+            msg = bot.send_message(message.chat.id, "Enter the webinar name")
+            bot.register_next_step_handler(msg, process_webinar_name_step)
+        else:
+            bot.reply_to(message, "You are not authorized to use this command")
+    except Exception as e:
+        print("add_webinar command", e)
+        bot.reply_to(message, "Error: " + str(e))
+
+
+def process_webinar_name_step(message):
+    try:
+        user_id = message.from_user.id
+        webinar_name = message.text
+        if webinar_name.lower() == "/stop":
+            # Остановить ввод вебинаров
+            bot.reply_to(message, "Input of webinars stopped")
+        else:
+            # Проверяем наличие атрибута 'webinars' в объекте пользователя
+            if user_id in user_dict:
+                user_dict[user_id].webinars = []
+                user_dict[user_id].webinars.append(Webinar(webinar_name, ""))
+
+                msg = bot.send_message(message.chat.id, "Enter the webinar date (YYYY-MM-DD)")
+                bot.register_next_step_handler(msg, process_webinar_date_step)
+            else:
+                bot.reply_to(message, "User not found")
+    except Exception as e:
+        print("webinar name step", e)
+        bot.reply_to(message, "Error: " + str(e))
+
+
+def process_webinar_date_step(message):
+    try:
+        user_id = message.from_user.id
+        webinar_date = message.text
+        user_dict[user_id].webinars[-1].date = webinar_date
+
+        sql = "INSERT INTO vebinar (name_vebinar, date_vebinar) VALUES (%s, %s)"
+        val = (user_dict[user_id].webinars[-1].name, user_dict[user_id].webinars[-1].date)
+        mycursor.execute(sql, val)
+        mydb.commit()
+
+        bot.send_message(message.chat.id, "Webinar information added successfully")
+
+        # Добавить возможность добавления следующего вебинара
+        msg = bot.send_message(message.chat.id, "Enter the next webinar name")
+        bot.register_next_step_handler(msg, process_webinar_name_step)
+    except Exception as e:
+        print("webinar date step", e)
+        bot.reply_to(message, "Error: " + str(e))
+
 
 bot.enable_save_next_step_handlers(delay=2)
 bot.load_next_step_handlers()
